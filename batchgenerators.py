@@ -25,11 +25,13 @@ def iterate_minibatches(inputs, targets, batchsize, shuffle=False):
         yield inputs[excerpt], targets[excerpt]
 
     # get the last batch, which might be smaller than the other (if len(inputs) is not a multiple of batchsize)
-    if shuffle:
-        excerpt = indices[start_idx + batchsize:]
-    else:
-        excerpt = slice(start_idx + batchsize, len(inputs))
-    yield inputs[excerpt], targets[excerpt]
+    new_start = start_idx+batchsize
+    if new_start<len(inputs):  # however, if it is not smaller, we have to make sure we dont return an empty batch
+        if shuffle:
+            excerpt = indices[new_start:]
+        else:
+            excerpt = slice(new_start, len(inputs))
+        yield inputs[excerpt], targets[excerpt]
 
 # ------------------------------------------------------------------
 
@@ -55,8 +57,10 @@ def expensive_minibatch_iterator(X,y,batchsize, expensive_time=5,verbose=False):
         yield X[excerpt], y[excerpt]
 
     # last batch
-    excerpt = slice(start_idx + batchsize, len(X))
-    yield X[excerpt], y[excerpt]
+    new_start = start_idx + batchsize
+    if new_start < len(X):
+        excerpt = slice(new_start, len(X))
+        yield X[excerpt], y[excerpt]
 
 
 def threaded_generator(generator, num_cached=5):
@@ -130,5 +134,7 @@ def iterate_batches_from_disk(X_npyfile, y_npyfile, batchsize):
         yield X_mmapped[excerpt], y_mmapped[excerpt]
 
     # last batch
-    excerpt = slice(start_idx + batchsize, nSamples)
-    yield X_mmapped[excerpt], y_mmapped[excerpt]
+    new_start = start_idx + batchsize
+    if new_start < nSamples:
+        excerpt = slice(new_start, nSamples)
+        yield X_mmapped[excerpt], y_mmapped[excerpt]
