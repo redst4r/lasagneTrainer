@@ -1,6 +1,7 @@
 from batchgenerators import *
 import numpy as np
 import tempfile
+import toolz
 
 """
 -----------------------------------------------------------------------------------------------------------------------
@@ -72,6 +73,12 @@ def test_iterate_batches_from_disk_no_empty_batches():
     gen = iterate_batches_from_disk(fnameX, fnameY, batchsize=10)
     assert_all_batches_nonempty(gen)
 
+def test_iterate_batches_from_disk_batchsize():
+    "test if the concatenated minibatches of a mem-map array correspond to the original input"
+    batchsize = 10
+    fnameX, fnameY, _, _ = create_disk_arrays(nSamples=100)
+    gen = iterate_batches_from_disk(fnameX, fnameY, batchsize=batchsize)
+    assert len(next(gen)[0]) == batchsize, 'wrong batchsize'
 """
 -----------------------------------------------------------------------------------------------------------------------
 iterate_minibatches
@@ -92,6 +99,12 @@ def test_iterate_minibatches_no_empty_batches():
     gen = iterate_minibatches(X, y, batchsize, shuffle=False)
     assert_all_batches_nonempty(gen)
 
+def test_iterate_minibatches_batchsize():
+    "make sure that theres not empty batches (the last one might be a bit tricky e.g.). Esp problematic if samples is a mukltiple of batchsize"
+    batchsize = 10
+    X, y = get_samples_labels(100)
+    gen = iterate_minibatches(X, y, batchsize, shuffle=False)
+    assert len(next(gen)[0])==batchsize,'wrong batchsize'
 
 """
 -----------------------------------------------------------------------------------------------------------------------
@@ -152,3 +165,28 @@ def test_random_crops_iterator_no_empty_batches():
     X, y = create_4D_Data(N=100)
     gen = random_crops_iterator(iterate_minibatches(X, y, batchsize=batchsize, shuffle=False), cropSize=10)
     assert_all_batches_nonempty(gen)
+
+
+"""
+-----------------------------------------------------------------------------------------------------------------------
+batch()
+-----------------------------------------------------------------------------------------------------------------------
+"""
+
+def test_batch_faithful():
+    X = list(range(11))
+    the_batches = batch(X, batchsize=3)
+    X_debatched = toolz.reduce(lambda l1,l2: l1+l2, the_batches)
+
+    assert X_debatched == X, 'different ouput prodcued'
+
+def test_batch_batchsize():
+    batchsize = 3
+    X = list(range(11))
+    the_batches = list(batch(X, batchsize=batchsize))
+    assert len(the_batches[0]) == batchsize, 'wrong batchsize produced'
+
+def test_batch_nonempty():
+    X = list(range(10))
+    the_batches = list(batch(X, batchsize=2))
+    assert all([_ is not None for _ in the_batches]) and all([_ != [] for _ in the_batches]), 'empty batch detected'
