@@ -131,10 +131,41 @@ def iterate_batches_from_disk(X_npyfile, y_npyfile, batchsize):
     assert len(y_mmapped) == nSamples, "X and y have different number of samples (1st dimension)"
     for start_idx in range(0, nSamples - batchsize + 1, batchsize):
         excerpt = slice(start_idx, start_idx + batchsize)
-        yield X_mmapped[excerpt], y_mmapped[excerpt]
+        yield X_mmapped[excerpt], y_mmapped[excerpt].astype('int32')   # TODO hack with the int32. should be handle when creating the labels. THis also breaks the unit test!
 
     # last batch
     new_start = start_idx + batchsize
     if new_start < nSamples:
         excerpt = slice(new_start, nSamples)
-        yield X_mmapped[excerpt], y_mmapped[excerpt]
+        yield X_mmapped[excerpt], y_mmapped[excerpt].astype('int32')  # TODO hack with the int32. should be handle when creating the labels. THis also breaks the unit test!
+
+
+def random_crops_iterator(generator, cropSize):
+
+    for batch_X, batch_label in generator:
+
+        cropped_batch_X = []
+        cropped_batch_Y = []
+        for i in range(len(batch_X)):  # iterate over the samples in the batch
+            img = batch_X[i]
+            label = batch_label[i]
+
+            img_cropped = _random_crop(img, cropSize)
+            cropped_batch_X.append(img_cropped)
+            cropped_batch_Y.append(label)
+
+        # stack together into a 4D image
+        stacked_batch = np.stack(cropped_batch_X)
+        stacked_y  = np.array(cropped_batch_Y)
+
+        assert stacked_batch.shape[:2] == batch_X.shape[:2]
+        assert stacked_y.shape == batch_label.shape
+
+        yield stacked_batch, stacked_y
+
+
+def _random_crop(img, cropsize):
+    channel, H, W = img.shape
+    upper_left_x = np.random.randint(0, H - cropsize)
+    upper_left_y = np.random.randint(0, W - cropsize)
+    return img[:, upper_left_x:upper_left_x + cropsize, upper_left_y:upper_left_y + cropsize]
