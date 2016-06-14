@@ -32,7 +32,7 @@ def iterate_minibatches(inputs, targets, batchsize, shuffle=False):
 
     indices = np.arange(len(inputs))
     if shuffle:
-        np.random.shuffle(indices)  # TODO untested
+        np.random.shuffle(indices)
 
     for excerpt in batch(indices, batchsize=batchsize):  # chucks the indices into smaller batches, called excerpt
         yield inputs[excerpt], targets[excerpt]
@@ -66,7 +66,7 @@ def expensive_minibatch_iterator(X,y,batchsize, expensive_time=5,verbose=False):
         yield X[excerpt], y[excerpt]
 
 
-def threaded_generator(generator, num_cached=5):
+def threaded_generator(generator, num_cached=5, verbose=False):
     """
     a asyncronous loader. num_cached determines how many minibatches get loading into mem at the same time
 
@@ -87,9 +87,14 @@ def threaded_generator(generator, num_cached=5):
 
     # define producer (putting items into queue)
     def producer():
+        if verbose:
+            dt = time.time()  # measure how long the loading takes
         for item in generator:  # this is what loads the data!
             the_queue.put(item)
-            # print('loaded a batch')
+            if verbose:  #TODO this should go before .put() in case the queue is full and put() blocks
+                elapseTime = time.time() - dt
+                print('loaded a batch in %.2f sec into queue [%d/%d]' % (elapseTime, the_queue.qsize(), the_queue.maxsize))
+                dt = time.time()
         the_queue.put(sentinel)
 
     # start producer (in a background thread)
@@ -98,11 +103,13 @@ def threaded_generator(generator, num_cached=5):
     thread.start()
 
     # run as consumer (read items from queue, in current thread)
-    item = the_queue.get()
+    item = the_queue.get()   # TODO for vrebose: the first consumption is not reported
     while item is not sentinel:
-        # print('getting a batch')
         yield item
         the_queue.task_done()
+        if verbose:
+            print("consuming from queue [%d/%d]" % (the_queue.qsize(), the_queue.maxsize))
+
         item = the_queue.get()
 
 

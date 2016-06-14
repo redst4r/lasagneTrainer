@@ -106,6 +106,24 @@ def test_iterate_minibatches_batchsize():
     gen = iterate_minibatches(X, y, batchsize, shuffle=False)
     assert len(next(gen)[0])==batchsize,'wrong batchsize'
 
+
+def test_iterate_minibatches_shuffle():
+
+    batchsize = 10
+    X, y = get_samples_labels(1000)
+
+    gen = iterate_minibatches(X, y, batchsize, shuffle=True)
+
+    result_X, result_y = zip(*list(gen))
+    result_X = np.concatenate(result_X)
+    result_y = np.concatenate(result_y)
+
+
+    assert np.any(np.logical_not(np.isclose(result_X,X)))
+    assert np.any(np.logical_not(np.isclose(result_y,y)))
+    # if we're really unlucky, shuffle might preserve the same order
+    # or shuffle y in such a way that 0/1 align even after shuffle
+    # however, really unrealistic for 1000 samples
 """
 -----------------------------------------------------------------------------------------------------------------------
 threaded_generator
@@ -190,3 +208,5 @@ def test_batch_nonempty():
     X = list(range(10))
     the_batches = list(batch(X, batchsize=2))
     assert all([_ is not None for _ in the_batches]) and all([_ != [] for _ in the_batches]), 'empty batch detected'
+
+
