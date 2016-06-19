@@ -24,3 +24,6 @@
 
 #python compiled files
 *.pyc
+
+# coverage.py
+*,cover

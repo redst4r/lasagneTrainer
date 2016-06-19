@@ -10,7 +10,7 @@ from nolearn.lasagne.util import ansi
 
 class NetworkTrainer(object):
     """trains a given lasagne network using gradient desend"""
-    def __init__(self, network):
+    def __init__(self, network, quiet=False):
         """
         network: last layer of the lasagne network
         """
@@ -19,7 +19,7 @@ class NetworkTrainer(object):
         # save the training/validation etc across training runs
         self.trainError, self.valError, self.valAccuracy = [], [], []
         self.W_array = []
-
+        self.quiet = quiet
         self.best_network_params = None
 
     def print_layers(self):
@@ -35,33 +35,50 @@ class NetworkTrainer(object):
 
         # calling training_generator(trainInput) has to create a generator that loops over the data once!
         # calling it again must provide another generator that again iterates over the data
-        print("Epoch\t\tTrLoss\t\tValLoss\t\tvalAcc\t\tTime")
+        if not self.quiet:
+            print("Epoch\t\tTrLoss\t\tValLoss\t\tvalAcc\t\tTime")
+
         for epoch in range(epochs):
             train_err, train_batches = 0, 0
-            start_time = time.time()
+            start_time_total = time.time()
+            start_time_train = time.time()
+
+            trainFun_time = 0  # how long do the evals of the training functions take
             for batch in training_generator(*trainInput):
                 inputs, targets = batch
+
+                tmp_time_train = time.time()
                 train_err += train_fn(inputs, targets)
+                trainFun_time += time.time() - tmp_time_train
+
                 train_batches += 1
+
+            dt_train = time.time() - start_time_train  # this is trainFun_time + time to load the batches
+
+            # print("Training time total: %d,  train_fn: %d,  batch time:%d " % (dt_train, trainFun_time, dt_train-trainFun_time))
 
             # validation
             val_err, val_acc, val_batches = 0, 0, 0
+
+            start_time_val= time.time()
             for batch in validation_generator(*valInput):
                 inputs, targets = batch
                 err, acc = val_fn(inputs, targets)
                 val_err += err
                 val_acc += acc
                 val_batches += 1
+            dt_val = time.time() - start_time_val
+            dt_total = time.time() - start_time_total
 
-            dt = time.time() - start_time
-            self._after_epoch_helper(train_err, val_err, val_acc, train_batches, val_batches, dt, epoch)
+            self._after_epoch_helper(train_err, val_err, val_acc, train_batches, val_batches, dt_total, epoch)
 
     def doTraining(self, trainData, trainLabels, valData, valLabels, train_fn, val_fn, pred_fn, epochs, batchsize):
         """
         train_fn, val_fn are theano.functions
         """
         # TODO this looks like a special case of doTraining_with_generators -> GENERALIZE
-        print("Epoch\t\tTrLoss\t\tValLoss\t\tvalAcc\t\tTime")
+        if not self.quiet:
+            print("Epoch\t\tTrLoss\t\tValLoss\t\tvalAcc\t\tTime")
         for epoch in range(epochs):
             # training
             train_err, train_batches = 0, 0
@@ -102,7 +119,8 @@ class NetworkTrainer(object):
         val_loss_normed = val_err / val_batches
         val_acc_normed = val_acc / val_batches * 100
 
-        self._print_epoch_summary(tr_loss_normed, val_loss_normed, val_acc_normed, dt, epoch)
+        if not self.quiet:
+            self._print_epoch_summary(tr_loss_normed, val_loss_normed, val_acc_normed, dt, epoch)
 
         # record the parametesr if new best network
         val_loss_best = all([val_loss_normed < _ for _ in self.valError])
