@@ -21,17 +21,6 @@ def create_disk_arrays(nSamples):
     return fnameX, fnameY, X,y
 
 
-def assert_all_batches_nonempty(generator):
-    " checks if any batch contains no items, that is an empty numpy array"
-    batches = list(generator)
-
-    batchsizes_X = [len(b[0]) for b in batches]
-    batchsizes_Y = [len(b[1]) for b in batches]
-
-    assert all(batchsizes_X), 'contains an empty minibatch'
-    assert all(batchsizes_Y), 'contains an empty minibatch'
-
-
 def get_samples_labels(nSamples=100, nFeatures=10):
     X = np.random.rand(nSamples,nFeatures)
     y = np.random.rand(nSamples)
@@ -43,8 +32,6 @@ def assert_equal_stacked_iterator_and_original(generator, originalX, originalY):
     # exhaust the generator
     result_X, result_y = zip(*list(generator))
 
-    #vstack X, hstack y (bit strange that its the other way around); for concatenate its actually consistent!
-
     result_X = np.concatenate(result_X)
     result_y = np.concatenate(result_y)
 
@@ -53,38 +40,52 @@ def assert_equal_stacked_iterator_and_original(generator, originalX, originalY):
     assert np.all(result_X == originalX), 'generator and X differ'
     assert np.all(result_y == originalY), 'generator and y differ'
 
+def assert_correct_batchsizes(generator, batchsize):
+    "checks that the genearotrs produce the sbatchsize requested and the no batch is empty!"
+    batches = list(generator)
+
+    # check that no batch is None
+    assert all([b[0] is not None for b in batches]), "x batch contains None"
+    assert all([b[1] is not None for b in batches]), "y batch contains None"
+
+    batchsizes_X = [len(b[0]) for b in batches]
+    batchsizes_Y = [len(b[1]) for b in batches]
+
+    "test empty batches"
+    assert all(batchsizes_X), 'contains an empty minibatch'
+    assert all(batchsizes_Y), 'contains an empty minibatch'
+
+    "test requested batchsize"
+    assert all([b == batchsize for b in  batchsizes_X[:-1] ]), "wrong batchsize"
+    assert all([b == batchsize for b in  batchsizes_Y[:-1] ]), "wrong batchsize"
+
+
 """
 -----------------------------------------------------------------------------------------------------------------------
 iterate_batches_from_disk
 -----------------------------------------------------------------------------------------------------------------------
 """
 
-def test_iterate_batches_from_disk():
+def test_iterate_batches_from_disk_faithful():
     "test if the concatenated minibatches of a mem-map array correspond to the original input"
     fnameX, fnameY, X, y = create_disk_arrays(nSamples=100)
     gen = iterate_batches_from_disk(fnameX, fnameY, batchsize=3)
     assert_equal_stacked_iterator_and_original(gen, X, y)
 
 
-def test_iterate_batches_from_disk_no_empty_batches():
-    "test if the concatenated minibatches of a mem-map array correspond to the original input"
-
-    fnameX, fnameY, _, _ = create_disk_arrays(nSamples=100)
-    gen = iterate_batches_from_disk(fnameX, fnameY, batchsize=10)
-    assert_all_batches_nonempty(gen)
-
 def test_iterate_batches_from_disk_batchsize():
     "test if the concatenated minibatches of a mem-map array correspond to the original input"
     batchsize = 10
     fnameX, fnameY, _, _ = create_disk_arrays(nSamples=100)
     gen = iterate_batches_from_disk(fnameX, fnameY, batchsize=batchsize)
-    assert len(next(gen)[0]) == batchsize, 'wrong batchsize'
+    assert_correct_batchsizes(gen, batchsize)
+
 """
 -----------------------------------------------------------------------------------------------------------------------
 iterate_minibatches
 -----------------------------------------------------------------------------------------------------------------------
 """
-def test_iterate_minibatches():
+def test_iterate_minibatches_faithful():
     "does the concat of minibatches represent the original data. esp if the datasize is not a multiple of batchsize "
     batchsize = 30
     X,y = get_samples_labels(100)
@@ -92,19 +93,13 @@ def test_iterate_minibatches():
     assert_equal_stacked_iterator_and_original(gen, X, y)
 
 
-def test_iterate_minibatches_no_empty_batches():
-    "make sure that theres not empty batches (the last one might be a bit tricky e.g.). Esp problematic if samples is a mukltiple of batchsize"
-    batchsize = 10
-    X, y = get_samples_labels(100)
-    gen = iterate_minibatches(X, y, batchsize, shuffle=False)
-    assert_all_batches_nonempty(gen)
-
 def test_iterate_minibatches_batchsize():
     "make sure that theres not empty batches (the last one might be a bit tricky e.g.). Esp problematic if samples is a mukltiple of batchsize"
     batchsize = 10
     X, y = get_samples_labels(100)
     gen = iterate_minibatches(X, y, batchsize, shuffle=False)
-    assert len(next(gen)[0])==batchsize,'wrong batchsize'
+
+    assert_correct_batchsizes(gen ,batchsize)
 
 
 def test_iterate_minibatches_shuffle():
@@ -118,7 +113,7 @@ def test_iterate_minibatches_shuffle():
     result_X = np.concatenate(result_X)
     result_y = np.concatenate(result_y)
 
-
+    # check that they are NOT the same
     assert np.any(np.logical_not(np.isclose(result_X,X)))
     assert np.any(np.logical_not(np.isclose(result_y,y)))
     # if we're really unlucky, shuffle might preserve the same order
@@ -129,7 +124,7 @@ def test_iterate_minibatches_shuffle():
 threaded_generator
 -----------------------------------------------------------------------------------------------------------------------
 """
-def test_threaded_generator():
+def test_threaded_generator_faithful():
 
     X,y = get_samples_labels(100)
     # the 'expensive' load/preprocess generator that loads data
@@ -148,7 +143,9 @@ def create_4D_Data(N):
     X = np.random.rand(N,1,28,28)
     y = np.random.rand(N)
     return X, y
-def test_random_crops_iterator():
+
+
+def test_random_crops_iterator_faithful():
     "assert that the debatched data is the same as the original"
     N = 100
     X,y =  create_4D_Data(N)
@@ -172,18 +169,8 @@ def test_random_crops_iterator_batchsize():
     X, y = create_4D_Data(N)
     cropSize = 10
     batchsize = 30
-    thegen = random_crops_iterator(iterate_minibatches(X, y, batchsize=30, shuffle=False), cropSize=cropSize)
-
-    A,B = next(thegen)
-
-    assert len(A) == batchsize and len(B)==batchsize
-
-def test_random_crops_iterator_no_empty_batches():
-    batchsize = 10
-    X, y = create_4D_Data(N=100)
-    gen = random_crops_iterator(iterate_minibatches(X, y, batchsize=batchsize, shuffle=False), cropSize=10)
-    assert_all_batches_nonempty(gen)
-
+    thegen = random_crops_iterator(iterate_minibatches(X, y, batchsize=batchsize, shuffle=False), cropSize=cropSize)
+    assert_correct_batchsizes(thegen, batchsize)
 
 """
 -----------------------------------------------------------------------------------------------------------------------
@@ -192,6 +179,7 @@ batch()
 """
 
 def test_batch_faithful():
+    "joining the batches must result the unbatched data"
     X = list(range(11))
     the_batches = batch(X, batchsize=3)
     X_debatched = toolz.reduce(lambda l1,l2: l1+l2, the_batches)
@@ -199,6 +187,7 @@ def test_batch_faithful():
     assert X_debatched == X, 'different ouput prodcued'
 
 def test_batch_batchsize():
+    "bit tricky to use the other functionality for the generators, as those assume that the batchelements are tuples: (X,y)"
     batchsize = 3
     X = list(range(11))
     the_batches = list(batch(X, batchsize=batchsize))
@@ -206,7 +195,8 @@ def test_batch_batchsize():
 
 def test_batch_nonempty():
     X = list(range(10))
-    the_batches = list(batch(X, batchsize=2))
+    gen = batch(X, batchsize=2)
+    the_batches = list(gen)
     assert all([_ is not None for _ in the_batches]) and all([_ != [] for _ in the_batches]), 'empty batch detected'
 
 
