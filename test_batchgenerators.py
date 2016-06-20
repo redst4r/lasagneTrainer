@@ -200,3 +200,34 @@ def test_batch_nonempty():
     assert all([_ is not None for _ in the_batches]) and all([_ != [] for _ in the_batches]), 'empty batch detected'
 
 
+
+"""
+-----------------------------------------------------------------------------------------------------------------------
+zscore
+-----------------------------------------------------------------------------------------------------------------------
+"""
+"note that we cannot test faithful, as the geneartor modifies the data by subtracting mean/std"
+def test_iterator_zscore_from_whole_data__standardize():
+    "make sure it really does zscore the dataset"
+    X = np.random.rand(1000,5,5)
+
+    m, s = X.mean(0), X.std(0)
+    basegen = iterate_minibatches(X, X, batchsize=10, shuffle=False)
+
+    zI = iterator_zscore_from_whole_data(basegen, m ,s)
+
+    result_X, result_y = zip(*list(zI))
+    result_X = np.concatenate(result_X)
+
+    assert np.all(np.isclose(result_X.mean(0), 0 )), 'non zero mean'
+    assert np.all(np.isclose(result_X.std(0), 1)), 'std != 1'
+
+
+def test_iterator_zscore_batchsize():
+    "test if the concatenated minibatches of a mem-map array correspond to the original input"
+    batchsize = 10
+    X, y = get_samples_labels(1000)
+    m, s = X.mean(0), X.std(0)
+    gen = iterator_zscore_from_whole_data(iterate_minibatches(X, y, batchsize, shuffle=False),
+                                          m,s)
+    assert_correct_batchsizes(gen, batchsize)

@@ -66,6 +66,25 @@ def expensive_minibatch_iterator(X,y,batchsize, expensive_time=5,verbose=False):
         yield X[excerpt], y[excerpt]
 
 
+
+def iterator_zscore_from_whole_data(batchgen, dataMean, dataStd):
+    """
+    gets the batches from the generator, subtract mean and std (not of the batch itself,
+    but the given ones, calc over the entire data) and returns zscored batches
+    :param batchgen:
+    :param dataMean:
+    :param dataStd:
+    :return:
+    """
+    # TODO untested
+    for Xbatch, yBatch in batchgen:
+        assert isinstance(Xbatch, np.ndarray), 'the batch has to an np.array; instead %s' %type(Xbatch)
+        assert Xbatch.shape[1:] == dataMean.shape == dataStd.shape
+        Xbatch_zscored = (Xbatch - dataMean) / dataStd
+        yield Xbatch_zscored, yBatch
+
+
+
 def threaded_generator(generator, num_cached=5, verbose=False):
     """
     a asyncronous loader. num_cached determines how many minibatches get loading into mem at the same time
@@ -140,9 +159,10 @@ def iterate_batches_from_disk(X_npyfile, y_npyfile, batchsize):
     nSamples = X_mmapped.shape[0]
     assert len(y_mmapped) == nSamples, "X and y have different number of samples (1st dimension)"
 
+    #TODO SHUFFLING?!
     indices = np.arange(nSamples)
     for excerpt in batch(indices, batchsize=batchsize):
-        yield X_mmapped[excerpt], y_mmapped[excerpt].astype('int32') # TODO hack with the int32. should be handle when creating the labels. THis also breaks the unit test!
+        yield X_mmapped[excerpt], y_mmapped[excerpt] # .astype('int32') # TODO hack with the int32. should be handle when creating the labels. THis also breaks the unit test!
 
 
 def random_crops_iterator(generator, cropSize):
@@ -172,6 +192,7 @@ def random_crops_iterator(generator, cropSize):
         assert stacked_y.shape == batch_label.shape
 
         yield stacked_batch, stacked_y
+
 
 
 def _random_crop(img, cropsize):
