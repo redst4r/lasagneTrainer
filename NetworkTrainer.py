@@ -17,7 +17,7 @@ class NetworkTrainer(object):
         self.network = network
 
         # save the training/validation etc across training runs
-        self.trainError, self.valError, self.valAccuracy = [], [], []
+        self.trainError, self.trainAccuracy, self.valError, self.valAccuracy = [], [], [], []
         self.W_array = []
         self.quiet = quiet
         self.best_network_params = None
@@ -36,10 +36,10 @@ class NetworkTrainer(object):
         # calling training_generator(trainInput) has to create a generator that loops over the data once!
         # calling it again must provide another generator that again iterates over the data
         if not self.quiet:
-            print("Epoch\t\tTrLoss\t\tValLoss\t\tvalAcc\t\tTime")
+            print("Epoch\t\tTrLoss\t\tTrAcc\t\tValLoss\t\tvalAcc\t\tTime")
 
         for epoch in range(epochs):
-            train_err, train_batches = 0, 0
+            train_err, train_batches, train_acc = 0, 0, 0
             start_time_total = time.time()
             start_time_train = time.time()
 
@@ -48,9 +48,10 @@ class NetworkTrainer(object):
                 inputs, targets = batch
 
                 tmp_time_train = time.time()
-                train_err += train_fn(inputs, targets)
+                terr, tacc = train_fn(inputs, targets)
+                train_err += terr
+                train_acc += tacc
                 trainFun_time += time.time() - tmp_time_train
-
                 train_batches += 1
 
             dt_train = time.time() - start_time_train  # this is trainFun_time + time to load the batches
@@ -70,7 +71,7 @@ class NetworkTrainer(object):
             dt_val = time.time() - start_time_val
             dt_total = time.time() - start_time_total
 
-            self._after_epoch_helper(train_err, val_err, val_acc, train_batches, val_batches, dt_total, epoch)
+            self._after_epoch_helper(train_err, train_acc, val_err, val_acc, train_batches, val_batches, dt_total, epoch)
 
     def doTraining(self, trainData, trainLabels, valData, valLabels, train_fn, val_fn, pred_fn, epochs, batchsize):
         """
@@ -81,11 +82,13 @@ class NetworkTrainer(object):
             print("Epoch\t\tTrLoss\t\tValLoss\t\tvalAcc\t\tTime")
         for epoch in range(epochs):
             # training
-            train_err, train_batches = 0, 0
+            train_err,train_acc, train_batches = 0, 0, 0
             start_time = time.time()
             for batch in iterate_minibatches(trainData, trainLabels, batchsize, shuffle=True):
                 inputs, targets = batch
-                train_err += train_fn(inputs, targets)
+                terr, tacc = train_fn(inputs, targets)
+                train_err += terr
+                train_acc += tacc
                 train_batches += 1
 
             # validation
@@ -100,9 +103,9 @@ class NetworkTrainer(object):
             dt = time.time() - start_time
 
             # remember the errors, update best net, pretty print
-            self._after_epoch_helper(train_err, val_err, val_acc, train_batches, val_batches, dt, epoch)
+            self._after_epoch_helper(train_err, train_acc, val_err, val_acc, train_batches, val_batches, dt, epoch)
 
-    def _after_epoch_helper(self, train_err, val_err, val_acc, train_batches, val_batches, dt, epoch):
+    def _after_epoch_helper(self, train_err, train_acc, val_err, val_acc, train_batches, val_batches, dt, epoch):
         """
         convenience fuction ussed by both doTraining and doTraining_with_generators
         :param train_err:
@@ -116,11 +119,12 @@ class NetworkTrainer(object):
         """
         # normalize the error to batches
         tr_loss_normed = train_err / train_batches
+        tr_acc_normed = train_acc / train_batches * 100
         val_loss_normed = val_err / val_batches
         val_acc_normed = val_acc / val_batches * 100
 
         if not self.quiet:
-            self._print_epoch_summary(tr_loss_normed, val_loss_normed, val_acc_normed, dt, epoch)
+            self._print_epoch_summary(tr_loss_normed, tr_acc_normed, val_loss_normed, val_acc_normed, dt, epoch)
 
         # record the parametesr if new best network
         val_loss_best = all([val_loss_normed < _ for _ in self.valError])
@@ -130,10 +134,11 @@ class NetworkTrainer(object):
 
         # record for later
         self.trainError.append(tr_loss_normed)
+        self.trainAccuracy.append(tr_acc_normed)
         self.valError.append(val_loss_normed)
         self.valAccuracy.append(val_acc_normed)
 
-    def _print_epoch_summary(self, tr_loss_normed, val_loss_normed, val_acc_normed, dt, epoch ):
+    def _print_epoch_summary(self, tr_loss_normed, tr_acc_normed, val_loss_normed, val_acc_normed, dt, epoch ):
         """
         does a pretty print of the epoch results in terms of train/val error and time taken.
         also colors the best errors
@@ -147,6 +152,9 @@ class NetworkTrainer(object):
         tr_loss_str = "{}{:.4f}{}".format(ansi.CYAN if tr_loss_best else "",
                                           tr_loss_normed,
                                           ansi.ENDC if tr_loss_best else "")
+        tr_acc_str = "{}{:.4f}{}".format(ansi.CYAN if tr_loss_best else "",
+                                         tr_acc_normed,
+                                         ansi.ENDC if tr_loss_best else "")
 
         val_loss_best = all([val_loss_normed < _ for _ in self.valError])
         val_loss_str = "{}{:.4f}{}".format(ansi.GREEN if val_loss_best else "",
@@ -158,7 +166,7 @@ class NetworkTrainer(object):
                                           val_acc_normed,
                                           ansi.ENDC if val_acc_best else "")
 
-        prettyString = "%d\t\t%s\t\t%s\t\t%s\t\t%.3f" % (epoch, tr_loss_str, val_loss_str, val_acc_str, dt)
+        prettyString = "%d\t\t%s\t\t%s\t\t%s\t\t%s\t\t%.3f" % (epoch, tr_loss_str, tr_acc_str, val_loss_str, val_acc_str, dt)
         print(prettyString)
 
     def predict(self, X, batchsize=None):
@@ -201,6 +209,7 @@ class NetworkTrainer(object):
         plt.legend(["train", "val"])
 
         plt.subplot(2, 1, 2)
-        plt.plot(self.valAccuracy, 'b-')
+        plt.plot(self.trainAccuracy, 'b-')
+        plt.plot(self.valAccuracy, 'g-')
         plt.xlabel("epoch")
         plt.ylabel("Accuracy")
