@@ -224,10 +224,31 @@ def test_iterator_zscore_from_whole_data__standardize():
 
 
 def test_iterator_zscore_batchsize():
-    "test if the concatenated minibatches of a mem-map array correspond to the original input"
+    "test that the output size is the same"
     batchsize = 10
     X, y = get_samples_labels(1000)
     m, s = X.mean(0), X.std(0)
     gen = iterator_zscore_from_whole_data(iterate_minibatches(X, y, batchsize, shuffle=False),
                                           m,s)
     assert_correct_batchsizes(gen, batchsize)
+
+"""
+-----------------------------------------------------------------------------------------------------------------------
+flip rotate
+-----------------------------------------------------------------------------------------------------------------------
+"""
+def test_flip_rotate_iterator_shape():
+    "make sure img dimensions dont change"
+    X = np.random.rand(1000,3, 5,5)
+    y = np.random.rand(1000)
+    basegen = iterate_minibatches(X, y, batchsize=10, shuffle=False)
+
+    zI = flip_rotate_iterator(basegen)
+
+    result_X, result_y = zip(*list(zI))
+    result_X = np.concatenate(result_X)
+    result_Y = np.concatenate(result_y)
+
+
+    assert result_Y.shape == (1000,)
+    assert result_X.shape == (1000,3, 5,5)
