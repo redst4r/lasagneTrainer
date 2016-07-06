@@ -140,6 +140,44 @@ def occlusion_heatmap(last_layer, x, target, square_length=7, batchsize=10):
     return heat_array, probs
 
 
+def plot_saliency_map(sMap, X):
+
+    # salmaps usually come as W x H x channels, but images as channel x  W x H
+    sMap = sMap.transpose([2,0,1])
+
+    assert len(sMap.shape) == 3
+    channels, W, H = X.shape
+    samples = 1
+    assert X.shape == sMap.shape
+
+    figsize = 10
+    figsize = (figsize, samples * figsize / 3)
+    figs, axes = plt.subplots(samples*channels, 3, figsize=figsize)
+
+    for ax in axes.flatten():
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.axis('off')
+
+
+    for n in range(channels):
+        x_channel = X[n,:,:]
+        smap_channel = sMap[n,:,:]
+        ax = axes[n]
+
+        ix_sp = n*3
+        ax[0].imshow(x_channel, interpolation='nearest', cmap='gray')
+        ax[0].set_title('image')
+        ax[1].imshow(smap_channel, interpolation='nearest', cmap='Reds')  #  vmin=0, vmax=1
+        ax[1].set_title('critical parts')
+        ax[2].imshow(x_channel, interpolation='nearest', cmap='gray')
+        ax[2].imshow(smap_channel, interpolation='nearest', cmap='Reds',
+                     alpha=0.6)
+        ax[2].set_title('super-imposed')
+
+
+
+
 def plot_heatmap(heatmap, X, figsize):
     if (X.ndim != 4):
         raise ValueError("This function requires the input data to be of "
@@ -214,7 +252,7 @@ def saliency_map_net(inputlayer, outputlayer, X, chop_nonlin=True, deterministic
 #         net, X, figsize, lambda net, X, n: -saliency_map_net(net, X))
 
 
-def synthesize_image(input_layer,output_layer, inputshape, which_class, gradient_steps,gradient_stepsize, LAM, chopNonlin=True):
+def synthesize_image(input_layer,output_layer, inputshape, which_class, gradient_steps,gradient_stepsize, LAM, chopNonlin=True, I0=None):
     """
     does gradient ascend in image space to maximize a certain class score, hence producing an image
     that maximizes a class
@@ -224,6 +262,8 @@ def synthesize_image(input_layer,output_layer, inputshape, which_class, gradient
     :param gradient_steps:
     :param gradient_stepsize:
     :param chopNonlin: maximize the class score before or after the nonlinearity: =True-> maximize the unnormalized score
+    :param I0: optinally, put in an image from which we start the optimization. Could be a natural image in whihc we want to enhance the features of the clas
+           If None, random initialization will be made
     :return:
     """
     from lasagne.regularization import l2
@@ -246,7 +286,11 @@ def synthesize_image(input_layer,output_layer, inputshape, which_class, gradient
     # I = np.zeros(inputshape,dtype='float32')
 
     # starting point of gradient ascend:
-    I = np.random.normal(0,1, inputshape).astype('float32')
+    if I0 is None:
+        I = np.random.normal(0,1, inputshape).astype('float32')
+    else:
+        I = I0
+        assert I.shape == inputshape
 
     I_progress = []
     score_progress = []
