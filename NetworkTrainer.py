@@ -178,6 +178,18 @@ class NetworkTrainer(object):
         prettyString = "%d\t\t%s\t\t%s\t\t%s\t\t%s\t\t%s" % (epoch, tr_loss_str, tr_acc_str, val_loss_str, val_acc_str, time_string)
         print(prettyString)
 
+    def _create_predict_fn(self):
+        """
+        if the trainer has not yet a compiled prediction theano_fn, create and store it
+        :return:
+        """
+        if not hasattr(self, 'pred_fn'):
+            prediction = lasagne.layers.get_output(self.network, deterministic=True)
+            input_layer = lasagne.layers.get_all_layers(self.network)[0]  # kind of hacky, get the input variable of the net
+            input_var = input_layer.input_var
+            assert isinstance(input_layer, lasagne.layers.InputLayer)
+            self.pred_fn = theano.function([input_var], prediction)
+
     def predict(self, X, batchsize=None):
         """
         use the trained network to predict scores for given samples
@@ -187,25 +199,33 @@ class NetworkTrainer(object):
         :param X:
         :return:
         """
-
-        if not hasattr(self, 'pred_fn'):
-            prediction = lasagne.layers.get_output(self.network, deterministic=True)
-            input_layer = lasagne.layers.get_all_layers(self.network)[0]  # kind of hacky, get the input variable of the net
-            input_var = input_layer.input_var
-            assert isinstance(input_layer, lasagne.layers.InputLayer)
-            self.pred_fn = theano.function([input_var], prediction)
-
-        # prediction, but in batches (mem overflow!)
-        # TODO replace with batch iterator
         if batchsize is None:
-            return self.pred_fn(X)
-        else:
-            scores = []
-            bar = progressbar.ProgressBar()
-            for start in bar(np.arange(0, X.shape[0], batchsize)):
-                thebatch = X[start:(start + batchsize)]
-                scores.append(self.pred_fn(thebatch))
-            return np.vstack(scores)
+            batchsize = len(X)
+
+        # wrap it in a simple iterator, so that predict_iterator works
+        dummyY = np.full(len(X), np.nan)  # y is never used, so skip it
+        the_iter = iterate_minibatches(inputs=X, targets=dummyY, batchsize=batchsize, shuffle=False)
+        return self.predict_iterator(the_iter)
+
+
+        # # prediction, but in batches (mem overflow!)
+        # # TODO replace with batch iterator
+        # if batchsize is None:
+        #     return self.pred_fn(X)
+        # else:
+        #     scores = []
+        #     bar = progressbar.ProgressBar()
+        #     for start in bar(np.arange(0, X.shape[0], batchsize)):
+        #         thebatch = X[start:(start + batchsize)]
+        #         scores.append(self.pred_fn(thebatch))
+        #     return np.vstack(scores)
+
+    def predict_iterator(self, X_iterator):
+        self._create_predict_fn()
+        bar = progressbar.ProgressBar()
+        pred_list = [self.pred_fn(xbatch) for xbatch, _ in bar(X_iterator)]  # default interface is a generator yielding both X,y. we only need X here
+
+        return np.concatenate(pred_list)
 
     def plot_error(self):
         plt.figure()
@@ -223,6 +243,21 @@ class NetworkTrainer(object):
         plt.ylabel("Accuracy")
 
 
+"workaround for batch prediction for pickled trainers that dont have that function"
+def trainer_iterator_pred(trainer, the_iterator):
+
+    if not hasattr(trainer, 'pred_fn'):
+        prediction = lasagne.layers.get_output(trainer.network, deterministic=True)
+        input_layer = lasagne.layers.get_all_layers(trainer.network)[0]  # kind of hacky, get the input variable of the net
+        input_var = input_layer.input_var
+        assert isinstance(input_layer, lasagne.layers.InputLayer)
+        trainer.pred_fn = theano.function([input_var], prediction)
+
+    bar = progressbar.ProgressBar()
+    pred_list = [trainer.pred_fn(xbatch)
+                 for xbatch, _ in bar(the_iterator)]  # default interface is a generator yielding both X,y. we only need X here
+
+    return np.concatenate(pred_list)
 
 # params.py: Implements IO functions for pickling network parameters.
 #
