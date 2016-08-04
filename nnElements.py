@@ -100,11 +100,10 @@ def number_of_params(network):
     return counter
 
 def number_of_params_per_layer(network):
-
     the_list = []
     for l in get_all_layers(network):
         for sv in l.get_params(trainable=True):
-            the_list.append((l.name, _params_in_var(sv)))
+            the_list.append((sv.name, _params_in_var(sv)))
     return the_list
 
 

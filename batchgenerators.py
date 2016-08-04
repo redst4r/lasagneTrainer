@@ -5,6 +5,11 @@ import time
 import collections
 
 
+def exhaust_generator(gen):
+    "just get all elements from the generator and merge the batches"
+    X, y = zip(*list(gen))
+    return np.concatenate(X), np.concatenate(y)
+
 def batch(some_iterable, batchsize):
     """
     splits the iterable into a couple of chunks of size n
@@ -22,6 +27,7 @@ def batch(some_iterable, batchsize):
 def iterate_minibatches(inputs, targets, batchsize, shuffle=False):
     """
     standard mini batch iterator over a dataset X,y, optional shuffling
+    inputs,targets are just numpy.arrays
     :param inputs:
     :param targets:
     :param batchsize:
@@ -123,10 +129,13 @@ def threaded_generator(generator, num_cached=5, verbose=False):
     # run as consumer (read items from queue, in current thread)
     item = the_queue.get()   # TODO for vrebose: the first consumption is not reported
     while item is not sentinel:
+        if verbose:
+            dt_consume = time.time()
         yield item
         the_queue.task_done()
         if verbose:
-            print("consuming from queue [%d/%d]" % (the_queue.qsize(), the_queue.maxsize))
+            dt_consume = time.time()-dt_consume
+            print("consuming from queue in %.2f sec [%d/%d]" % (dt_consume,the_queue.qsize(), the_queue.maxsize))
 
         item = the_queue.get()
 
@@ -195,6 +204,7 @@ def random_crops_iterator(generator, cropSize):
 
 def _random_crop(img, cropsize):
     "just does a random crop of the image. makes sure that we stay away from the image borders"
+    assert img.ndim == 3, "dimension is wrong, should be 3D: C x W x H"
     channel, H, W = img.shape
     upper_left_x = np.random.randint(0, H - cropsize)
     upper_left_y = np.random.randint(0, W - cropsize)

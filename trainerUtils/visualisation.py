@@ -7,7 +7,8 @@ import theano
 import theano.tensor as T
 import progressbar
 import lasagne
-from plottingUtils import tile_raster_images
+from lasagne.regularization import l2
+
 
 def viz_kernels_in_a_row(c1, c2):
     from scipy.signal import convolve2d
@@ -154,6 +155,9 @@ def plot_saliency_map(sMap, X):
     figsize = (figsize, samples * figsize / 3)
     figs, axes = plt.subplots(samples*channels, 3, figsize=figsize)
 
+    if samples*channels == 1:
+        axes = axes.reshape(1,3)
+
     for ax in axes.flatten():
         ax.set_xticks([])
         ax.set_yticks([])
@@ -174,8 +178,6 @@ def plot_saliency_map(sMap, X):
         ax[2].imshow(smap_channel, interpolation='nearest', cmap='Reds',
                      alpha=0.6)
         ax[2].set_title('super-imposed')
-
-
 
 
 def plot_heatmap(heatmap, X, figsize):
@@ -209,9 +211,10 @@ def plot_heatmap(heatmap, X, figsize):
     return plt
 
 
-def saliency_map(input, output, pred, X):
+def saliency_map(input, output, pred):
+    # todo cross entropy doesnt make sense if chopping the nonlinearity
     score = -binary_crossentropy(output[:, pred], np.array([1]).astype('float32')).sum()  # no idea why this conversion has to be done to float, but in32 results in floats returning
-    return np.abs(T.grad(score, input).eval({input: X}))  # WHY ABS?!
+    return abs(T.grad(score, input))  # WHY ABS?!
 
 
 def _get_output_before_nonlinearity(layer, deterministic):
@@ -222,9 +225,9 @@ def _get_output_before_nonlinearity(layer, deterministic):
     output_before_nonlin = layer.b + input_into_last.dot(layer.W)
     return output_before_nonlin
 
+
 def saliency_map_net(inputlayer, outputlayer, X, chop_nonlin=True, deterministic=True):
     """
-
     :param inputlayer:
     :param outputlayer:
     :param X:
@@ -233,23 +236,19 @@ def saliency_map_net(inputlayer, outputlayer, X, chop_nonlin=True, deterministic
     """
     input = inputlayer.input_var
 
-    output_before_nonlin = _get_output_before_nonlinearity(outputlayer, deterministic=deterministic)
-
     # TODO test output == outputlayer.nonlinearity(outputlayer.b + input_into_last.dot(outputlayer.W))
     # but for determinsitic
+    "get the predicted class labels"
     output = get_output(outputlayer , deterministic=deterministic)
     pred = output.eval({input: X}).argmax(axis=1).astype('int32')  # that just picks out the most likely class here
 
-    if chop_nonlin:
-        sali = saliency_map(input, output, pred, X)
-    else:
-        sali = saliency_map(input, output_before_nonlin, pred, X)
-    return sali[0].transpose(1, 2, 0).squeeze()
+    if chop_nonlin:  # if we want to chop of the nonlinearity, modify the output
+        output = _get_output_before_nonlinearity(outputlayer, deterministic=deterministic)
 
-#
-# def plot_saliency(net, X, figsize=(9, None)):
-#     return _plot_heat_map(
-#         net, X, figsize, lambda net, X, n: -saliency_map_net(net, X))
+    # create a theano function out of it
+    sal_fn = theano.function([input],  saliency_map(input, output, pred))
+    sali = sal_fn(X).transpose(0, 2, 3, 1)
+    return sali
 
 
 def synthesize_image(input_layer,output_layer, inputshape, which_class, gradient_steps,gradient_stepsize, LAM, chopNonlin=True, I0=None):
@@ -266,7 +265,6 @@ def synthesize_image(input_layer,output_layer, inputshape, which_class, gradient
            If None, random initialization will be made
     :return:
     """
-    from lasagne.regularization import l2
 
     assert inputshape[0]==1
     input_var = input_layer.input_var
@@ -280,17 +278,31 @@ def synthesize_image(input_layer,output_layer, inputshape, which_class, gradient
     regularized_score = classNeuron - LAM * l2(input_var)  # mind the SIGN: we MAXIMIZE class_prob, hence l2 must be subtracted
     theGrad = T.grad(regularized_score, input_var)
 
-    # gradient_fn = theano.function([input_var], theGrad)
+    gradient_fn = theano.function([input_var], theGrad)
     score_fn = theano.function([input_var], regularized_score)
 
-    # I = np.zeros(inputshape,dtype='float32')
 
     # starting point of gradient ascend:
     if I0 is None:
+        # I = np.zeros(inputshape,dtype='float32')
         I = np.random.normal(0,1, inputshape).astype('float32')
     else:
-        I = I0
+        I = np.copy(I0)  # otherwise we would modifiy the original image as a sideffect
         assert I.shape == inputshape
+
+# #((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((
+# #
+#     loss = - regularized_score # we want to maximize the score hence the minus sign
+#
+    params = [theano.shared(I, name='theImage')]
+#     params = [theano.shared(input_var)]
+
+    #
+    # updates = lasagne.updates.adam(loss, params) # **optimizer_params
+#
+#     train_fn = theano.function([input_var, target_var], [loss, train_acc], updates=updates)
+
+#     # ((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((
 
     I_progress = []
     score_progress = []
@@ -298,7 +310,7 @@ def synthesize_image(input_layer,output_layer, inputshape, which_class, gradient
     for i in bar(range(gradient_steps)):
         if i % 10 == 0:
             I_progress.append(I.copy())
-        gr = theGrad.eval({input_var: I})
+        gr = gradient_fn(I)
         I += gr * gradient_stepsize
         the_score = score_fn(I)
         score_progress.append(the_score)
@@ -308,3 +320,30 @@ def synthesize_image(input_layer,output_layer, inputshape, which_class, gradient
     return I_progress, score_progress
     # tile_raster_images(np.concatenate(I_progress), (28, 28), (10, 10), tile_spacing=(1, 1),scale_rows_to_unit_interval=True)
 
+
+def synth_compiled(input_layer,output_layer, I):
+    which_class = 0
+    LAM = 0.1
+
+    theImage = theano.shared(I, name='theImage')
+    params = [theImage]
+
+    classNeuron = get_output(output_layer, deterministic=True, inputs=theImage)[0, which_class]  # the zero is needed to get a scalar gradient (otherwise we would a single number per image)! we want a single image anyways
+
+    regularized_score = -(classNeuron - LAM * l2(theImage)) # turn this into a loss that ADAM minimizes
+    theGrad = T.grad(regularized_score, theImage)
+
+    updates = lasagne.updates.adam([theGrad], params, learning_rate=0.1)
+    synth_fn = theano.function([], [regularized_score], updates=updates)
+
+    terr = []
+    bar = progressbar.ProgressBar()
+    for i in bar(range(1000)):
+        terr.append(synth_fn())  # this also updates the params=images
+        # print(terr[-1])
+
+    Isynth = np.array(theImage.eval())
+    figure()
+    imshow(Isynth[0,0])
+    figure()
+    imshow(Isynth[0,1])

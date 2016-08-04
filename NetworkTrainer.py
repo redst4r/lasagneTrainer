@@ -24,6 +24,7 @@ class NetworkTrainer(object):
         self.W_array = []
         self.quiet = quiet
         self.best_network_params = None
+        self.best_network_params_epoch = None
 
     def print_layers(self):
         layers_list = lasagne.layers.get_all_layers(self.network)
@@ -139,6 +140,7 @@ class NetworkTrainer(object):
         if val_loss_best or not self.best_network_params:
             # new best performer or no other present yet
             self.best_network_params = lasagne.layers.get_all_param_values(self.network)
+            self.best_network_params_epoch = epoch
 
         # record for later
         self.trainError.append(tr_loss_normed)
@@ -207,19 +209,6 @@ class NetworkTrainer(object):
         the_iter = iterate_minibatches(inputs=X, targets=dummyY, batchsize=batchsize, shuffle=False)
         return self.predict_iterator(the_iter)
 
-
-        # # prediction, but in batches (mem overflow!)
-        # # TODO replace with batch iterator
-        # if batchsize is None:
-        #     return self.pred_fn(X)
-        # else:
-        #     scores = []
-        #     bar = progressbar.ProgressBar()
-        #     for start in bar(np.arange(0, X.shape[0], batchsize)):
-        #         thebatch = X[start:(start + batchsize)]
-        #         scores.append(self.pred_fn(thebatch))
-        #     return np.vstack(scores)
-
     def predict_iterator(self, X_iterator):
         self._create_predict_fn()
         bar = progressbar.ProgressBar()
@@ -235,12 +224,15 @@ class NetworkTrainer(object):
         plt.xlabel("epoch")
         plt.ylabel("Loss")
         plt.legend(["train", "val"])
+        plt.vlines(self.best_network_params_epoch, ymin=min(self.trainError), ymax=max(self.trainError))
 
         plt.subplot(2, 1, 2)
         plt.plot(self.trainAccuracy, 'b-')
         plt.plot(self.valAccuracy, 'g-')
         plt.xlabel("epoch")
         plt.ylabel("Accuracy")
+
+
 
 
 "workaround for batch prediction for pickled trainers that dont have that function"
@@ -269,7 +261,7 @@ PARAM_EXTENSION = 'params'
 def read_model_data(model, filename):
     """Unpickles and loads parameters into a Lasagne model."""
     filename = os.path.join('./', '%s.%s' % (filename, PARAM_EXTENSION))
-    with open(filename, 'r') as f:
+    with open(filename, 'rb') as f:
         data = pickle.load(f)
     nn.layers.set_all_param_values(model, data)
 
@@ -279,5 +271,5 @@ def write_model_data(model, filename):
     data = nn.layers.get_all_param_values(model)
     filename = os.path.join('./', filename)
     filename = '%s.%s' % (filename, PARAM_EXTENSION)
-    with open(filename, 'w') as f:
+    with open(filename, 'wb') as f:
         pickle.dump(data, f)
