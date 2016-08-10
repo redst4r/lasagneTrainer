@@ -7,15 +7,16 @@ import numpy as np
 import progressbar
 from nolearn.lasagne.util import ansi
 from collections import namedtuple
-
+from lasagne.layers import get_all_param_values
 timeinfo = namedtuple('timeinfo', 'total train_gpu train_batch val_gpu val_batch')
 # ------------------------------------------------------------------
 
 class NetworkTrainer(object):
     """trains a given lasagne network using gradient desend"""
-    def __init__(self, network, quiet=False):
+    def __init__(self, network, quiet=False, outfile_params=None):
         """
         network: last layer of the lasagne network
+        outfile_params: if not none, we save the parameters across epochs in this file
         """
         self.network = network
 
@@ -25,6 +26,7 @@ class NetworkTrainer(object):
         self.quiet = quiet
         self.best_network_params = None
         self.best_network_params_epoch = None
+        self.outfile_params = outfile_params
 
     def print_layers(self):
         layers_list = lasagne.layers.get_all_layers(self.network)
@@ -100,6 +102,27 @@ class NetworkTrainer(object):
                          val_gpu=dt_val_gpu, val_batch=dt_val_batchload )
 
             self._after_epoch_helper(train_err, train_acc, val_err, val_acc, train_batches, val_batches, the_timing, epoch)
+
+            if self.outfile_params is not None:
+                self._dump_params_to_disk()
+
+    def _dump_params_to_disk(self):
+        """
+        dumps the parameters to a list wihcih is stored on disk
+        handy to keep track of parameter evolution acrsoss epochs
+        :return:
+        """
+        if os.path.exists(self.outfile_params):  # load it if it exists (doesn exist in the first epoch)
+            with open(self.outfile_params, 'rb') as f:
+                Q = pickle.load(f)
+                assert isinstance(Q, list)
+        else:  # oyherwise start with empty list
+            Q = []
+
+        current_params = get_all_param_values(self.get_network())
+        Q.append(current_params)
+        with open(self.outfile_params, 'wb') as f:
+            pickle.dump(Q, f)
 
     def doTraining(self, trainData, trainLabels, valData, valLabels, train_fn, val_fn, pred_fn, epochs, batchsize):
         """
