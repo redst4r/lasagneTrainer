@@ -10,6 +10,7 @@ def exhaust_generator(gen):
     X, y = zip(*list(gen))
     return np.concatenate(X), np.concatenate(y)
 
+
 def batch(some_iterable, batchsize):
     """
     splits the iterable into a couple of chunks of size n
@@ -54,23 +55,13 @@ def expensive_minibatch_iterator(X,y,batchsize, expensive_time=5,verbose=False):
     :param batchsize:
     :return:
     """
-    # TODO: utilize iterate_minibatches instead
-
-    for start_idx in range(0, len(X) - batchsize + 1, batchsize):
+    for x_batch, y_batch in iterate_minibatches(X, y, batchsize, shuffle=False):
         if verbose:
             print('\t\tdoing expensive loading')
         time.sleep(expensive_time)  # just emulate some expensive loading/preprocess
-
         if verbose:
             print('\t\tdone expensive loading')
-        excerpt = slice(start_idx, start_idx + batchsize)
-        yield X[excerpt], y[excerpt]
-
-    # last batch
-    new_start = start_idx + batchsize
-    if new_start < len(X):
-        excerpt = slice(new_start, len(X))
-        yield X[excerpt], y[excerpt]
+        yield x_batch, y_batch
 
 
 def iterator_zscore_from_whole_data(batchgen, dataMean, dataStd):
@@ -170,7 +161,7 @@ def iterate_batches_from_disk(X_npyfile, y_npyfile, batchsize):
     #TODO SHUFFLING?!
     indices = np.arange(nSamples)
     for excerpt in batch(indices, batchsize=batchsize):
-        yield X_mmapped[excerpt], y_mmapped[excerpt] # .astype('int32') # TODO hack with the int32. should be handle when creating the labels. THis also breaks the unit test!
+        yield X_mmapped[excerpt], y_mmapped[excerpt]
 
 
 def random_crops_iterator(generator, cropSize):
@@ -209,6 +200,7 @@ def _random_crop(img, cropsize):
     upper_left_x = np.random.randint(0, H - cropsize)
     upper_left_y = np.random.randint(0, W - cropsize)
     return img[:, upper_left_x:upper_left_x + cropsize, upper_left_y:upper_left_y + cropsize]
+
 
 def flip_rotate_iterator(generator):
     "randomly applies horz/vertical flips and 90/180/270 degree rotations to each element of hte generator"

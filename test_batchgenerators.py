@@ -22,7 +22,7 @@ def create_disk_arrays(nSamples):
 
 
 def get_samples_labels(nSamples=100, nFeatures=10):
-    X = np.random.rand(nSamples,nFeatures)
+    X = np.random.rand(nSamples, nFeatures)
     y = np.random.rand(nSamples)
     return  X,y
 
@@ -36,9 +36,11 @@ def assert_equal_stacked_iterator_and_original(generator, originalX, originalY):
     result_y = np.concatenate(result_y)
 
     assert result_X.dtype == originalX.dtype, 'generator and x have different dtype'
-    assert result_y.dtype == originalY.dtype, 'generator and x have different dtype'
-    assert np.all(result_X == originalX), 'generator and X differ'
-    assert np.all(result_y == originalY), 'generator and y differ'
+    assert result_y.dtype == originalY.dtype, 'generator and y have different dtype'
+
+    np.testing.assert_array_equal(result_X, originalX, err_msg='generator and X differ')
+    np.testing.assert_array_equal(result_y, originalY, err_msg='generator and y differ')
+
 
 def assert_correct_batchsizes(generator, batchsize):
     "checks that the genearotrs produce the sbatchsize requested and the no batch is empty!"
@@ -160,7 +162,7 @@ def test_random_crops_iterator_faithful():
 
     # cannot compare X and X2 directly, just their sizes have to be consistent
     assert X2.shape == (N,X.shape[1], cropSize, cropSize)
-    assert np.all(y==y2)
+    np.testing.assert_equal(y,y2)
 
 
 def test_random_crops_iterator_batchsize():
@@ -178,6 +180,7 @@ batch()
 -----------------------------------------------------------------------------------------------------------------------
 """
 
+
 def test_batch_faithful():
     "joining the batches must result the unbatched data"
     X = list(range(11))
@@ -186,12 +189,14 @@ def test_batch_faithful():
 
     assert X_debatched == X, 'different ouput prodcued'
 
+
 def test_batch_batchsize():
     "bit tricky to use the other functionality for the generators, as those assume that the batchelements are tuples: (X,y)"
     batchsize = 3
     X = list(range(11))
     the_batches = list(batch(X, batchsize=batchsize))
     assert len(the_batches[0]) == batchsize, 'wrong batchsize produced'
+
 
 def test_batch_nonempty():
     X = list(range(10))
@@ -219,8 +224,9 @@ def test_iterator_zscore_from_whole_data__standardize():
     result_X, result_y = zip(*list(zI))
     result_X = np.concatenate(result_X)
 
-    assert np.all(np.isclose(result_X.mean(0), 0 )), 'non zero mean'
-    assert np.all(np.isclose(result_X.std(0), 1)), 'std != 1'
+    np.testing.assert_allclose(result_X.mean(0), 0 ,atol=1e-14, err_msg='non zero mean')
+    np.testing.assert_allclose(result_X.std(0), 1, err_msg='std != 1')
+
 
 
 def test_iterator_zscore_batchsize():

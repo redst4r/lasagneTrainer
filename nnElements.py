@@ -15,6 +15,7 @@ DNN_mode ='cuDNN'
 if DNN_mode=='cuda_convnet':
     warnings.warn('using cuda_convnet! faster but more restricted (channels kernelsize')
 
+
 def _my_batch_norm(in_layer):
     """
     my modified version of batchnorm: for ReLUs neither scaling nor bias is needed
@@ -24,12 +25,10 @@ def _my_batch_norm(in_layer):
     :param layer:
     :return:
     """
-
     if in_layer.nonlinearity.__name__ == rectify.__name__:
         kw = {'gamma': None}
     else:
         kw = {}
-
     return batch_norm(in_layer, **kw)
 
 
@@ -89,8 +88,10 @@ def _create_maxpool2D_layer(input_layer, **maxpool_params):
 s couple of functions to get info about the neural network
 """
 
+
 def _params_in_var(shared_var):
     return int(shared_var.size.eval())
+
 
 def number_of_params(network):
     "adds up how many free parameters are in a network altogether"
@@ -98,6 +99,7 @@ def number_of_params(network):
     for sv in get_all_params(network, trainable=True):
         counter += _params_in_var(sv)
     return counter
+
 
 def number_of_params_per_layer(network):
     the_list = []
@@ -107,10 +109,10 @@ def number_of_params_per_layer(network):
     return the_list
 
 
-
 def params_shapes(network):
     "returns tuple of (name, shape) for each parameter in the network"
     shapes = [(param.name, param.get_value().shape) for param in get_all_params(network,trainable=True) if param]
+
 
 def get_output_shapes(network):
 
