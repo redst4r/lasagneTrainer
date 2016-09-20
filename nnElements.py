@@ -11,9 +11,14 @@ from lasagne.nonlinearities import rectify
 "variable to determine which convolution implementation to use!"
 DNN_mode ='cuDNN'
 # DNN_mode ='cuda_convnet'
+# DNN_mode ='fallback'
 
 if DNN_mode=='cuda_convnet':
     warnings.warn('using cuda_convnet! faster but more restricted (channels kernelsize')
+
+if DNN_mode=='fallback':
+    warnings.warn('using fallback/non-GPU mode!')
+
 
 
 def _my_batch_norm(in_layer):

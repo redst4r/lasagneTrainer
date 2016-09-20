@@ -61,6 +61,34 @@ def assert_correct_batchsizes(generator, batchsize):
     assert all([b == batchsize for b in  batchsizes_X[:-1] ]), "wrong batchsize"
     assert all([b == batchsize for b in  batchsizes_Y[:-1] ]), "wrong batchsize"
 
+"""
+batch stacker
+"""
+
+def test_batch_stacker_faith():
+
+    nSamples = 100
+    batchsize = 3
+    X = np.random.rand(nSamples, 10)
+    y = np.random.binomial(1,0.5,nSamples)
+
+    original_gen = ((X[i], y[i]) for i in range(nSamples))
+    batch_stack_gen = batch_stacker(original_gen, batchsize)
+
+    assert_equal_stacked_iterator_and_original(batch_stack_gen, X, y)
+
+
+def test_batch_stacker_batchsize():
+
+    nSamples = 100
+    batchsize = 3
+    X = np.random.rand(nSamples, 10)
+    y = np.random.binomial(1,0.5,nSamples)
+
+    original_gen = ((X[i], y[i]) for i in range(nSamples))
+    batch_stack_gen = batch_stacker(original_gen, batchsize)
+
+    assert_correct_batchsizes(batch_stack_gen, batchsize)
 
 """
 -----------------------------------------------------------------------------------------------------------------------

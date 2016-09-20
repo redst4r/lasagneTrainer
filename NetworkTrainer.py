@@ -7,7 +7,7 @@ import numpy as np
 import progressbar
 from nolearn.lasagne.util import ansi
 from collections import namedtuple
-from lasagne.layers import get_all_param_values
+from lasagne.layers import get_all_param_values, get_all_layers, get_output
 timeinfo = namedtuple('timeinfo', 'total train_gpu train_batch val_gpu val_batch')
 # ------------------------------------------------------------------
 
@@ -217,7 +217,7 @@ class NetworkTrainer(object):
 
     def predict(self, X, batchsize=None):
         """
-        use the trained network to predict scores for given samples
+        use the trained network to predict scores for given samples.
 
         its a bit tricky since we first hve to create a prediction theano-function.
         this is cached in the attribute ._pred_fn, since it tae=kes a while to compute
@@ -256,10 +256,10 @@ class NetworkTrainer(object):
         plt.ylabel("Accuracy")
 
 
-
-
 "workaround for batch prediction for pickled trainers that dont have that function"
 def trainer_iterator_pred(trainer, the_iterator):
+    import warnings
+    warnings.warn('deprecated!!!')
 
     if not hasattr(trainer, 'pred_fn'):
         prediction = lasagne.layers.get_output(trainer.network, deterministic=True)
@@ -296,3 +296,36 @@ def write_model_data(model, filename):
     filename = '%s.%s' % (filename, PARAM_EXTENSION)
     with open(filename, 'wb') as f:
         pickle.dump(data, f)
+
+
+def cumulative_percentiles(x, percent):
+    A = np.array([np.percentile(x[i:], q=percent)  for i in range(len(x))])
+    return np.array(A )
+
+
+"""
+some helpers
+"""
+import theano.tensor as T
+
+def get_layer_by_name(network, layername):
+    layers = get_all_layers(network)
+    candiates = [_ for _ in layers if _.name == layername]
+    assert len(candiates) == 1, "more than one layer with name %s" % layername
+    return candiates[0]
+
+
+def get_all_outputs(network, x):
+    return [_.eval() for _ in get_output(get_all_layers(network), x)]
+
+
+def get_all_outputs_compiledFN(network):
+    """
+    returns a theano function that zields the output of each layer fo a given input sample
+    :param network:
+    :return:
+    """
+    in_var = T.tensor4(name='input', dtype='float32')
+    outputs = get_output(get_all_layers(network), in_var, deterministic=True)
+    out_fn = theano.function([in_var], outputs)
+    return out_fn

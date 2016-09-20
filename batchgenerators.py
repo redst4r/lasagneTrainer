@@ -25,6 +25,37 @@ def batch(some_iterable, batchsize):
         yield some_iterable[ndx:min(ndx + batchsize, l)]
 
 
+def batch_stacker(the_gen, batchsize):
+    """
+    takes a generator (yielding X,y tuples) and creates batches out of it, i.e. a batch of 10 3x28x28 images will
+    yield a 10x3x28x28 np.array
+    :param the_gen:
+    :param batchsize:
+    :return:
+    """
+    counter = 0
+    currentX, currentY = [], []
+
+    for A, B in the_gen:
+        currentX.append(A)
+        currentY.append(B)
+        counter += 1
+
+        if counter == batchsize:
+            stackedX = np.stack(currentX)
+            stackedY = np.stack(currentY)
+            yield stackedX, stackedY
+
+            counter = 0
+            currentX, currentY = [], []
+
+    # emit the lasta batch if still some data
+    if currentX != [] and currentY != []:
+        stackedX = np.stack(currentX)
+        stackedY = np.stack(currentY)
+        yield stackedX, stackedY
+
+
 def iterate_minibatches(inputs, targets, batchsize, shuffle=False):
     """
     standard mini batch iterator over a dataset X,y, optional shuffling
