@@ -124,11 +124,10 @@ class NetworkTrainer(object):
         with open(self.outfile_params, 'wb') as f:
             pickle.dump(Q, f)
 
-    def doTraining(self, trainData, trainLabels, valData, valLabels, train_fn, val_fn, pred_fn, epochs, batchsize):
+    def doTraining(self, trainData, trainLabels, valData, valLabels, train_fn, val_fn, epochs, batchsize):
         """
         train_fn, val_fn are theano.functions
         """
-        # TODO UNTESTED (not even run before)
         def gen_factory(x,y):
             return iterate_minibatches(x, y, batchsize, shuffle=True)
 

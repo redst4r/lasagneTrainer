@@ -1,12 +1,7 @@
-import numpy as np
-from lasagne.layers import get_output, InputLayer, DenseLayer, ReshapeLayer
-from lasagne.nonlinearities import softmax
+from lasagne.layers import get_output
 import theano
 import lasagne.objectives
 import theano.tensor as T
-from nnElements import _dense_and_dropout, _conv_and_maxpool
-from NetworkTrainer import NetworkTrainer
-from batchgenerators import iterate_batches_from_disk, random_crops_iterator
 
 
 def get_network_cost_functions(network, input_var, target_var, optimizer, optimizer_params):
