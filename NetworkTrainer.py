@@ -5,7 +5,6 @@ import lasagne.layers
 import theano
 import numpy as np
 import progressbar
-from nolearn.lasagne.util import ansi
 from collections import namedtuple
 from lasagne.layers import get_all_param_values, get_all_layers, get_output
 timeinfo = namedtuple('timeinfo', 'total train_gpu train_batch val_gpu val_batch')
@@ -300,6 +299,18 @@ def write_model_data(model, filename):
 def cumulative_percentiles(x, percent):
     A = np.array([np.percentile(x[i:], q=percent)  for i in range(len(x))])
     return np.array(A )
+
+"""
+for color printing of the loss/epochs
+"""
+class ansi:
+    BLUE = '\033[94m'
+    CYAN = '\033[36m'
+    GREEN = '\033[32m'
+    MAGENTA = '\033[35m'
+    RED = '\033[31m'
+    ENDC = '\033[0m'
+
 
 
 """
