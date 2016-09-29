@@ -1,4 +1,8 @@
-import queue
+try:
+    import queue
+except ImportError:  # for python2.7
+    import Queue as queue
+
 import threading
 import numpy as np
 import time
