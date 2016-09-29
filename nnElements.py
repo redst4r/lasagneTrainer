@@ -125,3 +125,10 @@ def get_output_shapes(network):
         return 'x'.join(map(str, layer.output_shape[1:]))
 
     return [(layer.name, _outsize(layer)) for layer in get_all_layers(network)]
+
+
+def freeze(layer):
+    "makes all parameters of the layer non-trainable"
+    for param in layer.params:
+        layer.params[param].discard('trainable')
+    return layer  # optional, if you want to use it in-line
