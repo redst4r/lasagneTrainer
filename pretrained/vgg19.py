@@ -12,7 +12,13 @@ from lasagne.layers import DenseLayer
 from lasagne.layers import NonlinearityLayer
 from lasagne.layers import DropoutLayer
 from lasagne.layers import Pool2DLayer as PoolLayer
-from lasagne.layers.dnn import Conv2DDNNLayer as ConvLayer
+import warnings
+try:
+    from lasagne.layers.dnn import Conv2DDNNLayer as ConvLayer
+except ImportError:
+    warnings.warn('using lasange conv layer, not cudDNN')
+    from lasagne.layers import Conv2DLayer as ConvLayer
+
 from lasagne.nonlinearities import softmax
 try:
     import cPickle as pickle
@@ -76,7 +82,7 @@ def build_model():
 def build_pretrained_vgg19():
 
     net = build_model()  # net is a dict of layers (layers are already linked)
-    weightfile = path.join(path.dirname(__file__), 'vgg19.pkl')  # weightfile = '/home/michael_strasser/deepLearning/bodenmiller/pretrained/vgg19.pkl'
+    weightfile = path.join(path.dirname(__file__), 'vgg19.pkl')
     with open(weightfile, 'rb') as f:
         the_model = pickle.load(f, encoding='latin1')  # encoding: rather annoying bug, since pkl was from py2: https://stackoverflow.com/questions/37350578/unicodedecodeerror-in-pickle-load
     thetas = the_model['param values']
