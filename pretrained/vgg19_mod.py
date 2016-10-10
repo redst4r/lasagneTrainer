@@ -7,7 +7,7 @@ import lasagne
 from DNN_costfunctions import get_network_cost_functions
 
 
-def create_channel_transformer_layers(input_layer, channel_transformers_shape, name_prefix:str, nonlinearity:str='ReLU'):
+def create_channel_transformer_layers(input_layer, channel_transformers_shape, name_prefix, nonlinearity='ReLU'):
     """
     creates a series of channel transformations (no real covolutions but just linear combinations of the channels some nonlin act)
 
@@ -44,7 +44,7 @@ def create_channel_transformer_layers(input_layer, channel_transformers_shape, n
     return the_cascade
 
 
-def modify_vgg19(input_var, in_channels, channel_transformers_shape:tuple, n_classes):
+def modify_vgg19(input_var, in_channels, channel_transformers_shape, n_classes):
     """
     load the VGG19 net, pretrained on Imagenet
     however, this expects three channels, but we have 34 channels

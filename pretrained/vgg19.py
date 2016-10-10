@@ -84,7 +84,12 @@ def build_pretrained_vgg19():
     net = build_model()  # net is a dict of layers (layers are already linked)
     weightfile = path.join(path.dirname(__file__), 'vgg19.pkl')
     with open(weightfile, 'rb') as f:
-        the_model = pickle.load(f, encoding='latin1')  # encoding: rather annoying bug, since pkl was from py2: https://stackoverflow.com/questions/37350578/unicodedecodeerror-in-pickle-load
+
+        import sys
+        if sys.version_info >= (3,):
+            the_model = pickle.load(f, encoding='latin1')  # encoding: rather annoying bug, since pkl was from py2: https://stackoverflow.com/questions/37350578/unicodedecodeerror-in-pickle-load
+        else:
+            the_model = pickle.load(f)
     thetas = the_model['param values']
     set_all_param_values(net['prob'], thetas)  # net.prob is the last layer, set_all works on all downstream layers
 
