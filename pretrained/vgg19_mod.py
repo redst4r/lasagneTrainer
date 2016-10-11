@@ -1,48 +1,11 @@
 from pretrained.vgg19 import build_pretrained_vgg19
-from nnElements import _create_conv2D_layer, freeze
+from nnElements import freeze
 from lasagne.layers import InputLayer, DenseLayer, NonlinearityLayer, get_all_layers, get_output, NINLayer
 from lasagne.nonlinearities import softmax
 import theano.tensor as T
-import lasagne
 from DNN_costfunctions import get_network_cost_functions
-
-
-def create_channel_transformer_layers(input_layer, channel_transformers_shape, name_prefix, nonlinearity='ReLU'):
-    """
-    creates a series of channel transformations (no real covolutions but just linear combinations of the channels some nonlin act)
-
-    :param input_layer:
-    :param channel_transformers_shape:
-           tuple, each entry giving  #neurons of a layer, taking the 34 channels to 3 eventually, e.g (3,) is a single nonlinear transform
-           (64,3) will be 34c -> 64c -> 3c
-           last tuple entry must be 3, as this is the size the vgg can handle
-    :param nonlinearity: string, determining the nonlineartiy used, 'linear' or 'ReLU';
-           all layers constructed ahve the same nonlinearity
-
-    :return: list of the layers created
-    """
-    if nonlinearity== 'ReLU':
-        nonlin = lasagne.nonlinearities.rectify
-    elif nonlinearity == 'linear':
-        nonlin = lasagne.nonlinearities.linear
-    else:
-        raise ValueError('unknown nonlinearity')
-
-    last_in = input_layer
-    "insert the linear combo layer 34->3 in the beginning"
-    the_cascade =[]
-    for i,n_neurons in enumerate(channel_transformers_shape):
-        conv_params = {'name': '%s_%d'%(name_prefix,i) ,
-                       'num_filters': n_neurons,
-                       'filter_size': 1,
-                       'pad': 'valid',
-                       'nonlinearity': nonlin}
-        comboLayer = _create_conv2D_layer(last_in, do_batchnorm=False, **conv_params)
-        the_cascade.append(comboLayer)
-        last_in = comboLayer
-
-    return the_cascade
-
+from pretrained.utils import create_channel_transformer_layers
+import warnings
 
 def modify_vgg19(input_var, in_channels, channel_transformers_shape, n_classes):
     """
@@ -60,7 +23,7 @@ def modify_vgg19(input_var, in_channels, channel_transformers_shape, n_classes):
     vgg_size = (224,224)
 
     net = build_pretrained_vgg19()
-    "fix all pretrained weights and only optimize the linCombo layers?!"
+    warnings.warn("fix all pretrained weights and only optimize the linCombo layers?!")
     for l in get_all_layers(net['prob']):
         freeze(l)
 
