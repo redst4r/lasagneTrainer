@@ -7,9 +7,9 @@ from DNN_costfunctions import get_network_cost_functions
 from pretrained.utils import create_channel_transformer_layers
 import warnings
 
-def modify_vgg19(input_var, in_channels, channel_transformers_shape, n_classes):
+def modify_vgg19(input_var, in_channels, channel_transformers_shape, n_classes, freeze_weights):
     """
-    load the VGG19 net, pretrained on Imagenet
+    load the VGG19 net, pretrained on Imagenet. NOTE THAT CURRENTLY THE WEIGHTS ARE FIXED/FREEZED!!
     however, this expects three channels, but we have 34 channels
     hence, put in a first layer that goes from 34->3 channels. Just a linear combo of the 34 channels, i.e. a 1x1 convolution with maybe a nonlinearity
 
@@ -23,9 +23,11 @@ def modify_vgg19(input_var, in_channels, channel_transformers_shape, n_classes):
     vgg_size = (224,224)
 
     net = build_pretrained_vgg19()
-    warnings.warn("fix all pretrained weights and only optimize the linCombo layers?!")
-    for l in get_all_layers(net['prob']):
-        freeze(l)
+
+    if freeze_weights:
+        print('freezing the pretrained layers')
+        for l in get_all_layers(net['prob']):
+            freeze(l)
 
     # replace the old input layer, with one that takes the 34 channels
     net['input'] = InputLayer((None, in_channels)  + vgg_size , input_var=input_var)
@@ -47,12 +49,12 @@ def modify_vgg19(input_var, in_channels, channel_transformers_shape, n_classes):
 
 
 
-def create_vgg19_mod(in_channels, transform_shape, optimizer, optimizer_params, n_classes):
+def create_vgg19_mod(in_channels, transform_shape, optimizer, optimizer_params, n_classes, freeze_weights):
 
     input_var = T.tensor4('inputs')
     target_var = T.ivector('targets')  # symbol for the labels
 
-    net_dict = modify_vgg19(input_var, in_channels, transform_shape, n_classes)
+    net_dict = modify_vgg19(input_var, in_channels, transform_shape, n_classes, freeze_weights)
 
     train_fn, val_fn = get_network_cost_functions(net_dict['prob'], input_var, target_var, optimizer, optimizer_params)
 
