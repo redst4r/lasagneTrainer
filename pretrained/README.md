@@ -22,3 +22,5 @@ To just create the architecture
 from pretrained.vgg19 import build_model
 net = build_model()
 ```
+
+# Googlenet

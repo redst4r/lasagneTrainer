@@ -5,16 +5,23 @@ from lasagne.nonlinearities import softmax
 import theano.tensor as T
 from DNN_costfunctions import get_network_cost_functions
 from pretrained.utils import create_channel_transformer_layers
-import warnings
+
+"""
+to create a slightly modified VGGnet that can handle images with a different nubmer of input channels
+(other than the standard 3RGB channels)
+"""
+
 
 def modify_vgg19(input_var, in_channels, channel_transformers_shape, n_classes, freeze_weights):
     """
-    load the VGG19 net, pretrained on Imagenet. NOTE THAT CURRENTLY THE WEIGHTS ARE FIXED/FREEZED!!
-    however, this expects three channels, but we have 34 channels
-    hence, put in a first layer that goes from 34->3 channels. Just a linear combo of the 34 channels, i.e. a 1x1 convolution with maybe a nonlinearity
+    load the VGG19 net, pretrained on Imagenet.
+    however, this expects three channels, but we have N channels
+    hence, put in a first layer that goes from N->3 channels. Just a linear combo of the N channels,
+    i.e. a 1x1 convolution with maybe a nonlinearity
 
-    channel_transformers_shape: tuple, each entry giving  #neurons of a layer, taking the 34 channels to 3 eventually, e.g (3,) is a single nonlinear transform
-                                (64,3) will be 34c -> 64c -> 3c
+    channel_transformers_shape: tuple, each entry giving  #neurons of a layer, taking the N channels to 3 eventually,
+                                e.g (3,) is a single nonlinear transform
+                                (64,3) will be N channels -> 64c -> 3c
                                 last tuple entry must be 3, as this is the size the vgg can handle
     """
 
@@ -48,10 +55,20 @@ def modify_vgg19(input_var, in_channels, channel_transformers_shape, n_classes, 
     return net
 
 
-
 def create_vgg19_mod(in_channels, transform_shape, optimizer, optimizer_params, n_classes, freeze_weights):
+    """
+    creates a modified VGG, and the corresponding training/validation functions
+    :param in_channels: number of input channels
+    :param transform_shape: how to transform the intput channels into RGB (as expected by VGG), see doc. of modify_vgg19
+    :param optimizer: usually 'adam'
+    :param optimizer_params: parameters passed to the optimizer, e.g. {'learning_rate': 0.1}
+    :param n_classes: number of classes to classify
+    :param freeze_weights: boolean, if True, the weights of the VGG are frozen, and only the transformer weights are learned in training
+    :return:
+    """
 
-    input_var = T.tensor4('inputs')
+    'theano variables for the neural net'
+    input_var = T.tensor4('inputs')    # symbol for the input images
     target_var = T.ivector('targets')  # symbol for the labels
 
     net_dict = modify_vgg19(input_var, in_channels, transform_shape, n_classes, freeze_weights)
