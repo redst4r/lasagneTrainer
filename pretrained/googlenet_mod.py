@@ -44,7 +44,7 @@ def modify_googlenet(input_var, in_channels, channel_transformers_shape, n_class
 
     "replace the top softmax (1000 classes) by a softmax with the approropate classes"
     # the last layer before the softmax:
-    hidden_layer = net['pool5/7x7_s1']
+    hidden_layer = net['pool5_drop_7x7_s1']   # this is the dropout layer that was missing in the standard implemention of lasagne
     del net['loss3/classifier']  # thats the old 1000h layer without a softmax, lets delete it just to be sure
     net['prob'] = DenseLayer(hidden_layer, num_units=n_classes, nonlinearity=softmax, name='softmax')
 

@@ -22,7 +22,6 @@ import warnings
 try:
     from lasagne.layers.dnn import Conv2DDNNLayer as ConvLayer
     from lasagne.layers.dnn import MaxPool2DDNNLayer as PoolLayerDNN
-
 except ImportError:
     warnings.warn('using lasange conv layer, not cudDNN')
     from lasagne.layers import Conv2DLayer as ConvLayer
@@ -33,6 +32,7 @@ try:
 except ImportError: # python 3 only knows pickle
     import pickle
 
+from lasagne.layers import DropoutLayer
 from lasagne.layers import set_all_param_values
 from os import path
 
@@ -118,7 +118,11 @@ def build_model():
                                       [128, 384, 192, 384, 48, 128]))
 
     net['pool5/7x7_s1'] = GlobalPoolLayer(net['inception_5b/output'])
-    net['loss3/classifier'] = DenseLayer(net['pool5/7x7_s1'],
+
+    # added a dropout layer (mentioned in the publication, missing in the lasagne-code)
+    net['pool5_drop_7x7_s1'] = DropoutLayer(net['pool5/7x7_s1'], p=0.5)
+
+    net['loss3/classifier'] = DenseLayer(net['pool5_drop_7x7_s1'],
                                          num_units=1000,
                                          nonlinearity=linear)
     net['prob'] = NonlinearityLayer(net['loss3/classifier'],

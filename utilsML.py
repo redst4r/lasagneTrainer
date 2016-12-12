@@ -1,4 +1,3 @@
-import  matplotlib.pyplot as plt
 import numpy as np
 
 """
@@ -9,6 +8,8 @@ def get_auc(scores, truelabel, do_plot=False):
     fpr, tpr, thresholds = roc_curve(truelabel, scores, drop_intermediate=False)
     the_auc = auc(fpr, tpr)
     if do_plot:
+        import matplotlib.pyplot as plt
+
         plt.figure()
         plt.scatter(fpr, tpr, c=thresholds)
         plt.title("AUC %.02f" % the_auc)
@@ -32,6 +33,8 @@ def acc_vs_cutoff(y,scores, do_plot=False):
     acc = np.array(acc)
 
     if do_plot:
+        import matplotlib.pyplot as plt
+
         plt.plot(cutoff_range, acc)
         plt.xlabel('prob. cutoff')
         plt.ylabel('Accuracy')
